@@ -18,7 +18,7 @@ app.listen(3000);
 2. 为每一个相应创建ctx对象，通过app.createContext方法创建ctx对象
 3. 处理响应，通过app.handleRequest方法处理响应，底层基于ServerResponse.end方法。
 
-#####koa中要分清楚两组对象
+##### koa中要分清楚两组对象
 
 * request,response是koa的拓展对象
 * req,res是node的原生对象（http.IncomingMessage和http.ServerResponse）
@@ -47,13 +47,11 @@ function method(proto, target, name) {
   }
 }
 ```
-#####单一context原则
+##### 单一context原则
 
 每一个http请求，koa都会通过app.createContext创建一个context并共享给所有的全局中间件使用，所有的关于请求和响应的东西都放在其里面。同时我们也创建了request和response，并且将app、req、res、ctx也存放在了request、和response对象中。这样我们将这些职责进行划分，比如request是进一步封装req的，response是进一步封装res的。
 
 ##### koa-compose
-
-Koa-compose是实现洋葱模型的核心
 
 koa-compose的源码如下
 
@@ -147,4 +145,33 @@ app.listen(3000);
 //第二个中间件函数next之后!
 //第一个中间件函数next之后!
 ```
+如果仅仅是这些的话，只是通过函数调用栈的执行顺序的话，其实express也能实现,
+```js
+const express = require("express");
 
+const app = express()
+
+app.use(function m1 (req, res, next) {
+  console.log('m1')
+  next()
+  console.log('m1 end')
+})
+
+app.use(function m2 (req, res, next) {
+  console.log('m2')
+  next()
+  console.log('m2 end')
+})
+
+app.use(function m3 (req, res, next) {
+  console.log('m3')
+  res.end('hello')
+})
+
+app.listen(8080)
+```
+重点在于`res.end()`的时机，express使用res.end()直接返回数据,而koa可以在中间件中不断的修改ctx.body来设置数据,并不直接响应res.end(),然后在handleRequest的代码中我们可以看到，中间件执行完后我们才去handleResponse，这个时候才会执行res.end(ctx.body)。这样就给响应前的操作留下来空间，请求和响应都在中间件之外，因此才被成为洋葱模型
+
+`return fnMiddleware(ctx).then(handleResponse).catch(onerror);`
+具体可以参考 [koa原理分析](https://omnipotent-front-end.github.io/library/koa.html#koa%E7%9A%84%E6%B4%8B%E8%91%B1%E6%A8%A1%E5%9E%8B%E6%98%AF%E6%80%8E%E4%B9%88%E7%90%86%E8%A7%A3%E7%9A%84%EF%BC%9F)
+[koa和express的区别](https://github.com/koajs/koa/blob/master/docs/koa-vs-express.md)
